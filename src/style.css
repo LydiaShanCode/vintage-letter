@@ -1,0 +1,298 @@
+:root {
+  --ink-color: #2b2419;
+  --vellum-color: #faf6f0;
+  --paper-shadow: rgba(0, 0, 0, 0.15);
+  --warm-fade: rgba(231, 218, 198, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Homemade Apple', cursive;
+  background: #1a1612;
+  color: var(--ink-color);
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+/* Layer 1: Photo Collage Background */
+.collage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #e7dac6 0%, #d4c4a8 100%);
+  overflow: hidden;
+  z-index: 1;
+}
+
+.collage::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(ellipse at center, transparent 0%, rgba(26, 22, 18, 0.2) 100%);
+  pointer-events: none;
+}
+
+.photo {
+  position: absolute;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 4px 12px var(--paper-shadow);
+  border: 8px solid #faf8f5;
+  border-bottom-width: 20px;
+  filter: sepia(0.3) contrast(0.9) brightness(0.95);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.photo::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Washi tape strips */
+.tape {
+  position: absolute;
+  background: rgba(255, 250, 240, 0.7);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+.tape::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(200, 190, 180, 0.1) 10px,
+    rgba(200, 190, 180, 0.1) 20px
+  );
+}
+
+/* Layer 2: Vellum Sheet */
+.vellum {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--vellum-color);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+  z-index: 10;
+  transform-origin: bottom right;
+  transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.vellum::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(180, 160, 140, 0.015) 3px,
+      rgba(180, 160, 140, 0.015) 6px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(180, 160, 140, 0.015) 3px,
+      rgba(180, 160, 140, 0.015) 6px
+    );
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.vellum::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 250, 240, 0.8) 0%,
+    rgba(250, 245, 235, 0.6) 50%,
+    rgba(245, 240, 230, 0.7) 100%
+  );
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.vellum.peeling {
+  transform: perspective(1200px) rotateX(-8deg) rotateZ(2deg) translateY(-20px) translateX(15px) scale(0.98);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 5px 15px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.05);
+}
+
+.vellum.lifted {
+  transform: perspective(1200px) rotateX(-25deg) rotateZ(5deg) translateY(-80px) translateX(50px) scale(0.92);
+  box-shadow: 
+    0 40px 100px rgba(0, 0, 0, 0.3),
+    0 10px 30px rgba(0, 0, 0, 0.2);
+  filter: brightness(1.1);
+}
+
+/* Layer 3: Letter Text */
+.letter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: max(env(safe-area-inset-top), 40px) max(env(safe-area-inset-right), 30px) max(env(safe-area-inset-bottom), 60px) max(env(safe-area-inset-left), 30px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  z-index: 11;
+}
+
+#letter-content {
+  font-size: clamp(16px, 4.5vw, 19px);
+  line-height: 1.8;
+  color: var(--ink-color);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-width: 600px;
+  margin: 0 auto;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Writing cursor effect */
+.writing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background: var(--ink-color);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s infinite;
+  opacity: 0.7;
+}
+
+@keyframes blink {
+  0%, 49% { opacity: 0.7; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Peel Corner Affordance */
+.peel-corner {
+  position: fixed;
+  bottom: max(env(safe-area-inset-bottom), 20px);
+  right: max(env(safe-area-inset-right), 20px);
+  width: 60px;
+  height: 60px;
+  z-index: 12;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.peel-corner.visible {
+  opacity: 1;
+}
+
+.peel-corner::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 48%,
+    rgba(0, 0, 0, 0.05) 50%,
+    var(--vellum-color) 52%
+  );
+  box-shadow: -2px -2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 0 4px;
+  transform: rotate(0deg);
+  transform-origin: bottom right;
+  transition: all 0.3s ease;
+}
+
+.peel-corner:active::before,
+.peel-corner.active::before {
+  transform: rotate(-10deg) scale(1.2);
+  box-shadow: -4px -4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Collage reveal on peel */
+body.vellum-peeled .collage .photo {
+  filter: sepia(0.1) contrast(1) brightness(1);
+}
+
+/* Touch feedback */
+@media (hover: none) and (pointer: coarse) {
+  .peel-corner {
+    width: 70px;
+    height: 70px;
+  }
+  
+  .peel-corner::before {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* Grain overlay */
+.grain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 100;
+  mix-blend-mode: multiply;
+}
