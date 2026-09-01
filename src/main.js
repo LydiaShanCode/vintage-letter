@@ -7,8 +7,7 @@ const PAUSE_AFTER = { '.': 280, '!': 280, '?': 280, ',': 120, ';': 160, ':': 160
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const bookEl = document.getElementById('book');
-const playBtn = document.getElementById('play');
-const pauseBtn = document.getElementById('pause');
+const playBtn = document.getElementById('toggle-play');
 const restartBtn = document.getElementById('restart');
 
 const leafCount = PAGES.length / 2;
@@ -202,8 +201,9 @@ function turn(direction) {
 
 function setPlaying(next) {
   playing = next;
+  playBtn.textContent = playing ? '[pause]' : '[play]';
   playBtn.setAttribute('aria-pressed', String(playing));
-  pauseBtn.setAttribute('aria-pressed', String(!playing));
+  playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   if (playing && spreadComplete && !flipping && spread < leafCount) {
     turn(1);
   }
@@ -337,8 +337,7 @@ setupDrag();
 applySpread();
 setPlaying(true);
 
-playBtn.addEventListener('click', () => setPlaying(true));
-pauseBtn.addEventListener('click', () => setPlaying(false));
+playBtn.addEventListener('click', () => setPlaying(!playing));
 restartBtn.addEventListener('click', restart);
 document.addEventListener('keydown', onKey);
 

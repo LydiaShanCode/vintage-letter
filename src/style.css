@@ -48,46 +48,31 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 28px;
+  gap: 36px;
 }
 
 .control {
   appearance: none;
   border: 0;
   background: transparent;
-  padding: 6px;
-  width: 36px;
-  height: 36px;
-  color: #c4c4c4;
+  padding: 4px 0;
+  color: #b4b4b4;
   cursor: pointer;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-}
-
-.control svg {
-  width: 22px;
-  height: 22px;
-  display: block;
-  fill: currentColor;
-}
-
-#restart svg {
-  fill: none;
-}
-
-.control[aria-pressed="true"] {
-  color: #9a9a9a;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  line-height: 1;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .control:hover {
-    color: #9a9a9a;
+    color: #8c8c8c;
   }
 }
 
 .control:active {
-  color: #7d7d7d;
+  color: #6e6e6e;
 }
 
 .book-stage {
