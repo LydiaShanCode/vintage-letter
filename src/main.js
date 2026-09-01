@@ -1,284 +1,345 @@
 import './style.css';
+import { PAGES } from './content.js';
 
-// Configuration
-const PHOTOS = [
-  '/photos/01-cafe-selfie.jpg',
-  '/photos/02-cloud-ceiling.jpg',
-  '/photos/03-facetime.png',
-  '/photos/04-night-citi.jpg',
-  '/photos/05-photobooth.jpg',
-];
+const BASE_SPEED = 22;
+const SPEED_VARIANCE = 14;
+const PAUSE_AFTER = { '.': 280, '!': 280, '?': 280, ',': 120, ';': 160, ':': 160, '\n': 220 };
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const LETTER_FILE = '/letter.txt';
+const bookEl = document.getElementById('book');
+const playBtn = document.getElementById('play');
+const pauseBtn = document.getElementById('pause');
+const restartBtn = document.getElementById('restart');
 
-// Writing speed configuration (milliseconds per character)
-const BASE_SPEED = 45;
-const SPEED_VARIANCE = 25;
-const PAUSE_AFTER_PUNCTUATION = {
-  '.': 400,
-  '!': 400,
-  '?': 400,
-  ',': 200,
-  ';': 250,
-  ':': 250,
-  '\n': 300,
-};
+const leafCount = PAGES.length / 2;
+let spread = 0;
+let flipping = false;
+let playing = true;
+let writeToken = 0;
+let didDrag = false;
+let spreadComplete = false;
 
-// State
-let letterText = '';
-let writingComplete = false;
-let isPeeling = false;
-
-// Initialize the experience
-async function init() {
-  createCollage();
-  await loadLetter();
-  addGrainOverlay();
-  
-  // Wait a moment for the scene to settle, then start writing
-  setTimeout(() => {
-    startWriting();
-  }, 800);
-  
-  // Set up peel interaction after writing completes
-  setupPeelInteraction();
+function leafEls() {
+  return [...bookEl.querySelectorAll('.leaf')];
 }
 
-// Create the photo collage background
-function createCollage() {
-  const collage = document.getElementById('collage');
-  
-  // Photo configurations (position, rotation, size)
-  const photoConfigs = [
-    { photo: PHOTOS[0], left: '5%', top: '8%', width: '35%', rotate: -4 },
-    { photo: PHOTOS[1], right: '8%', top: '5%', width: '38%', rotate: 3 },
-    { photo: PHOTOS[2], left: '10%', bottom: '15%', width: '32%', rotate: 2 },
-    { photo: PHOTOS[3], right: '5%', bottom: '20%', width: '30%', rotate: -3 },
-    { photo: PHOTOS[4], left: '35%', top: '35%', width: '28%', rotate: -2 },
-  ];
-  
-  photoConfigs.forEach((config, index) => {
-    const photo = document.createElement('div');
-    photo.className = 'photo';
-    photo.style.backgroundImage = `url(${config.photo})`;
-    photo.style.width = config.width;
-    photo.style.aspectRatio = '4/5';
-    photo.style.transform = `rotate(${config.rotate}deg)`;
-    
-    if (config.left) photo.style.left = config.left;
-    if (config.right) photo.style.right = config.right;
-    if (config.top) photo.style.top = config.top;
-    if (config.bottom) photo.style.bottom = config.bottom;
-    
-    collage.appendChild(photo);
-    
-    // Add washi tape over some photos
-    if (index % 2 === 0) {
-      const tape = createTape(config);
-      collage.appendChild(tape);
-    }
+function buildBook() {
+  const spine = document.createElement('div');
+  spine.className = 'spine';
+  bookEl.appendChild(spine);
+
+  for (let i = 0; i < leafCount; i += 1) {
+    const leaf = document.createElement('div');
+    leaf.className = 'leaf';
+    leaf.dataset.leaf = String(i);
+    leaf.style.zIndex = String(leafCount - i);
+
+    const front = renderPage(PAGES[i * 2], 'front');
+    const back = renderPage(PAGES[i * 2 + 1], 'back');
+    leaf.append(front, back);
+    bookEl.appendChild(leaf);
+  }
+}
+
+function renderPage(page, face) {
+  const pageEl = document.createElement('article');
+  pageEl.className = `page ${face}`;
+  pageEl.dataset.page = String(page.id);
+
+  const inner = document.createElement('div');
+  inner.className = 'page-inner';
+
+  page.photos.forEach((photo) => {
+    const frame = document.createElement('div');
+    frame.className = photo.rotate ? 'photo is-rotated' : 'photo';
+    frame.style.left = photo.left;
+    frame.style.top = photo.top;
+    frame.style.width = photo.width;
+    frame.style.height = photo.height;
+    frame.style.opacity = String(photo.opacity ?? 1);
+
+    const img = document.createElement('img');
+    img.src = photo.src;
+    img.alt = '';
+    img.draggable = false;
+    frame.appendChild(img);
+    inner.appendChild(frame);
+  });
+
+  if (page.tab) {
+    const tab = document.createElement('div');
+    tab.className = 'tab';
+    inner.appendChild(tab);
+  }
+
+  const tracing = document.createElement('div');
+  tracing.className = `tracing ${page.tracing === 'full' ? 'is-full' : 'is-sheet'}`;
+  tracing.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (didDrag) return;
+    tracing.classList.toggle('is-lifted');
+  });
+
+  const letter = document.createElement('div');
+  letter.className = 'letter';
+  letter.dataset.fullText = page.text;
+  tracing.appendChild(letter);
+  inner.appendChild(tracing);
+  pageEl.appendChild(inner);
+  return pageEl;
+}
+
+function visiblePages() {
+  if (spread === 0) return [PAGES[0]];
+  if (spread === leafCount) return [PAGES[PAGES.length - 1]];
+  return [PAGES[spread * 2 - 1], PAGES[spread * 2]];
+}
+
+function letterElFor(pageId) {
+  return bookEl.querySelector(`.page[data-page="${pageId}"] .letter`);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
   });
 }
 
-// Create washi tape element
-function createTape(photoConfig) {
-  const tape = document.createElement('div');
-  tape.className = 'tape';
-  
-  const isHorizontal = Math.random() > 0.5;
-  
-  if (isHorizontal) {
-    tape.style.width = '40%';
-    tape.style.height = '20px';
-    tape.style.left = photoConfig.left || 'auto';
-    tape.style.right = photoConfig.right || 'auto';
-    tape.style.top = photoConfig.top ? `calc(${photoConfig.top} + 5%)` : 'auto';
-  } else {
-    tape.style.width = '20px';
-    tape.style.height = '30%';
-    tape.style.left = photoConfig.left ? `calc(${photoConfig.left} + 2%)` : 'auto';
-    tape.style.right = photoConfig.right ? `calc(${photoConfig.right} + 2%)` : 'auto';
-    tape.style.top = photoConfig.top || 'auto';
-  }
-  
-  tape.style.transform = `rotate(${(Math.random() - 0.5) * 8}deg)`;
-  
-  return tape;
-}
-
-// Load letter text from file
-async function loadLetter() {
-  try {
-    const response = await fetch(LETTER_FILE);
-    letterText = await response.text();
-  } catch (error) {
-    console.error('Failed to load letter:', error);
-    // Fallback letter if file can't be loaded
-    letterText = `My dearest,\n\nThis letter finds you where you are.\n\nYours always`;
+async function waitIfPaused(token) {
+  while (!playing && token === writeToken) {
+    await sleep(40);
   }
 }
 
-// Animate the letter being written
-async function startWriting() {
-  const letterContent = document.getElementById('letter-content');
-  let currentIndex = 0;
-  
-  // Create cursor element
+async function writeText(letter, text, token) {
   const cursor = document.createElement('span');
   cursor.className = 'writing-cursor';
-  
-  async function writeNextCharacter() {
-    if (currentIndex >= letterText.length) {
-      // Writing complete
-      cursor.remove();
-      writingComplete = true;
-      showPeelCorner();
-      return;
-    }
-    
-    const char = letterText[currentIndex];
-    
-    // Add character to the content
-    const textNode = document.createTextNode(char);
-    letterContent.appendChild(textNode);
-    letterContent.appendChild(cursor);
-    
-    // Scroll to keep cursor in view
-    cursor.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    currentIndex++;
-    
-    // Calculate delay until next character
-    let delay = BASE_SPEED + (Math.random() - 0.5) * SPEED_VARIANCE;
-    
-    // Add pause after punctuation
-    if (PAUSE_AFTER_PUNCTUATION[char]) {
-      delay += PAUSE_AFTER_PUNCTUATION[char];
-    }
-    
-    // Occasionally add a small thinking pause
-    if (Math.random() < 0.05) {
-      delay += Math.random() * 300;
-    }
-    
-    setTimeout(writeNextCharacter, delay);
+
+  if (reduceMotion) {
+    letter.textContent = text;
+    return;
   }
-  
-  writeNextCharacter();
+
+  for (let i = 0; i < text.length; i += 1) {
+    if (token !== writeToken) return;
+    await waitIfPaused(token);
+    if (token !== writeToken) return;
+    const char = text[i];
+    letter.appendChild(document.createTextNode(char));
+    letter.appendChild(cursor);
+    let delay = BASE_SPEED + (Math.random() - 0.5) * SPEED_VARIANCE;
+    if (PAUSE_AFTER[char]) delay += PAUSE_AFTER[char];
+    if (Math.random() < 0.04) delay += Math.random() * 180;
+    await sleep(delay);
+  }
+
+  cursor.remove();
 }
 
-// Show the peel corner affordance
-function showPeelCorner() {
-  const corner = document.querySelector('.peel-corner');
-  setTimeout(() => {
-    corner.classList.add('visible');
-  }, 1000);
+async function writeSpread() {
+  const token = ++writeToken;
+  spreadComplete = false;
+  const pages = visiblePages();
+
+  pages.forEach((page) => {
+    const letter = letterElFor(page.id);
+    if (letter) letter.replaceChildren();
+  });
+
+  for (const page of pages) {
+    if (token !== writeToken) return;
+    const letter = letterElFor(page.id);
+    if (!letter) continue;
+    await writeText(letter, page.text, token);
+    await sleep(token === writeToken ? 180 : 0);
+  }
+
+  if (token !== writeToken) return;
+  spreadComplete = true;
+  if (!playing || spread >= leafCount) return;
+  await sleep(1100);
+  if (token === writeToken && playing) turn(1);
 }
 
-// Set up the vellum peel interaction
-function setupPeelInteraction() {
-  const vellum = document.getElementById('vellum');
-  const corner = document.querySelector('.peel-corner');
-  let touchStartY = 0;
-  let touchStartX = 0;
-  let isPeeled = false;
-  
-  // Touch/mouse handlers for the corner
-  const startPeel = (e) => {
-    if (!writingComplete) return;
-    
-    isPeeling = true;
-    corner.classList.add('active');
-    vellum.classList.add('peeling');
-    
-    if (e.type === 'touchstart') {
-      touchStartY = e.touches[0].clientY;
-      touchStartX = e.touches[0].clientX;
-    }
-  };
-  
-  const continuePeel = (e) => {
-    if (!isPeeling) return;
-    
-    let deltaY = 0;
-    let deltaX = 0;
-    
-    if (e.type === 'touchmove') {
-      e.preventDefault();
-      deltaY = touchStartY - e.touches[0].clientY;
-      deltaX = e.touches[0].clientX - touchStartX;
-    }
-    
-    // If dragged up/right enough, lift the vellum
-    if (deltaY > 60 || deltaX > 60) {
-      liftVellum();
-    }
-  };
-  
-  const endPeel = () => {
-    if (!isPeeling) return;
-    
-    isPeeling = false;
-    corner.classList.remove('active');
-    
-    if (!isPeeled) {
-      vellum.classList.remove('peeling');
-    }
-  };
-  
-  const liftVellum = () => {
-    if (isPeeled) {
-      // Put it back down
-      vellum.classList.remove('lifted');
-      vellum.classList.add('peeling');
-      document.body.classList.remove('vellum-peeled');
-      isPeeled = false;
-      setTimeout(() => {
-        vellum.classList.remove('peeling');
-      }, 100);
-    } else {
-      // Lift it up
-      vellum.classList.remove('peeling');
-      vellum.classList.add('lifted');
-      document.body.classList.add('vellum-peeled');
-      isPeeled = true;
-    }
-    isPeeling = false;
-    corner.classList.remove('active');
-  };
-  
-  // Mouse events
-  corner.addEventListener('mousedown', startPeel);
-  document.addEventListener('mousemove', continuePeel);
-  document.addEventListener('mouseup', endPeel);
-  
-  // Touch events
-  corner.addEventListener('touchstart', startPeel, { passive: false });
-  document.addEventListener('touchmove', continuePeel, { passive: false });
-  document.addEventListener('touchend', endPeel);
-  
-  // Click/tap to toggle
-  corner.addEventListener('click', (e) => {
-    if (!writingComplete) return;
-    e.stopPropagation();
-    liftVellum();
+function syncLeafStack() {
+  leafEls().forEach((leaf, index) => {
+    const flipped = leaf.classList.contains('flipped');
+    if (leaf.classList.contains('is-turning') || leaf.classList.contains('is-dragging')) return;
+    leaf.style.zIndex = String(flipped ? index + 1 : leafCount - index);
   });
 }
 
-// Add film grain overlay
-function addGrainOverlay() {
-  const grain = document.createElement('div');
-  grain.className = 'grain';
-  document.body.appendChild(grain);
+function applySpread() {
+  bookEl.dataset.spread = String(spread);
+  bookEl.classList.toggle('is-open', spread > 0 && spread < leafCount);
 }
 
-// Handle first interaction to start animation (for browsers that block autoplay)
-let hasInteracted = false;
-document.addEventListener('touchstart', () => {
-  if (!hasInteracted && !writingComplete) {
-    hasInteracted = true;
-  }
-}, { once: true, passive: true });
+function turn(direction) {
+  const nextSpread = spread + direction;
+  if (flipping || nextSpread < 0 || nextSpread > leafCount) return false;
 
-// Start the experience
-init();
+  flipping = true;
+  writeToken += 1;
+
+  const leafIndex = direction > 0 ? spread : nextSpread;
+  const leaf = bookEl.querySelector(`.leaf[data-leaf="${leafIndex}"]`);
+  leaf.style.transform = '';
+  leaf.classList.add('is-turning');
+  leaf.classList.toggle('flipped', direction > 0);
+
+  spread = nextSpread;
+  applySpread();
+
+  window.setTimeout(() => {
+    leaf.classList.remove('is-turning');
+    syncLeafStack();
+    flipping = false;
+    writeSpread();
+  }, reduceMotion ? 0 : 700);
+
+  return true;
+}
+
+function setPlaying(next) {
+  playing = next;
+  playBtn.setAttribute('aria-pressed', String(playing));
+  pauseBtn.setAttribute('aria-pressed', String(!playing));
+  if (playing && spreadComplete && !flipping && spread < leafCount) {
+    turn(1);
+  }
+}
+
+function restart() {
+  spreadComplete = false;
+  writeToken += 1;
+  flipping = false;
+  didDrag = false;
+  setPlaying(true);
+
+  leafEls().forEach((leaf, index) => {
+    leaf.classList.remove('flipped', 'is-turning', 'is-dragging');
+    leaf.style.transform = '';
+    leaf.style.zIndex = String(leafCount - index);
+  });
+
+  bookEl.querySelectorAll('.letter').forEach((node) => node.replaceChildren());
+  bookEl.querySelectorAll('.tracing.is-lifted').forEach((node) => {
+    node.classList.remove('is-lifted');
+  });
+
+  spread = 0;
+  applySpread();
+  writeSpread();
+}
+
+function setupDrag() {
+  let drag = null;
+
+  const pageWidth = () => bookEl.getBoundingClientRect().width / 2;
+
+  function targetLeaf(direction) {
+    const index = direction > 0 ? spread : spread - 1;
+    if (index < 0 || index >= leafCount) return null;
+    return bookEl.querySelector(`.leaf[data-leaf="${index}"]`);
+  }
+
+  function follow(leaf, direction, dx) {
+    const ratio = Math.max(0, Math.min(1, Math.abs(dx) / pageWidth()));
+    const angle = direction > 0 ? -180 * ratio : -180 + 180 * ratio;
+    leaf.style.transform = `rotateY(${angle}deg)`;
+    return ratio;
+  }
+
+  function finish(leaf, direction, ratio) {
+    leaf.classList.remove('is-dragging');
+    leaf.style.transform = '';
+    bookEl.classList.remove('is-dragging');
+
+    if (ratio > 0.28) {
+      turn(direction);
+    } else {
+      syncLeafStack();
+      writeSpread();
+    }
+  }
+
+  bookEl.addEventListener('pointerdown', (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (flipping) return;
+    didDrag = false;
+    drag = {
+      id: event.pointerId,
+      x: event.clientX,
+      direction: 0,
+      leaf: null,
+    };
+    bookEl.setPointerCapture(event.pointerId);
+  });
+
+  bookEl.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x;
+
+    if (!drag.direction && Math.abs(dx) > 14) {
+      drag.direction = dx < 0 ? 1 : -1;
+      drag.leaf = targetLeaf(drag.direction);
+      if (!drag.leaf) {
+        drag = null;
+        return;
+      }
+      didDrag = true;
+      setPlaying(false);
+      writeToken += 1;
+      drag.leaf.classList.add('is-dragging');
+      bookEl.classList.add('is-dragging');
+    }
+
+    if (!drag.direction || !drag.leaf) return;
+    event.preventDefault();
+    follow(drag.leaf, drag.direction, dx);
+  });
+
+  function endDrag(event) {
+    if (!drag || event.pointerId !== drag.id) return;
+    const current = drag;
+    drag = null;
+
+    if (!current.leaf || !current.direction) return;
+    const dx = event.clientX - current.x;
+    const ratio = Math.max(0, Math.min(1, Math.abs(dx) / pageWidth()));
+    finish(current.leaf, current.direction, current.direction > 0 ? (dx < 0 ? ratio : 0) : (dx > 0 ? ratio : 0));
+  }
+
+  bookEl.addEventListener('pointerup', endDrag);
+  bookEl.addEventListener('pointercancel', endDrag);
+}
+
+function onKey(event) {
+  if (event.key === ' ' || event.key === 'Spacebar') {
+    event.preventDefault();
+    setPlaying(!playing);
+    return;
+  }
+  if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    setPlaying(false);
+    turn(1);
+  }
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    setPlaying(false);
+    turn(-1);
+  }
+}
+
+buildBook();
+setupDrag();
+applySpread();
+setPlaying(true);
+
+playBtn.addEventListener('click', () => setPlaying(true));
+pauseBtn.addEventListener('click', () => setPlaying(false));
+restartBtn.addEventListener('click', restart);
+document.addEventListener('keydown', onKey);
+
+writeSpread();
