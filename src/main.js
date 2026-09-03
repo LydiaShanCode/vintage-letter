@@ -59,7 +59,7 @@ function renderPage(page, face) {
     frame.style.opacity = String(photo.opacity ?? 1);
 
     const img = document.createElement('img');
-    img.src = photo.src;
+    img.src = import.meta.env.BASE_URL + photo.src.replace(/^\//, '');
     img.alt = '';
     img.draggable = false;
     frame.appendChild(img);
