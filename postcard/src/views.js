@@ -80,7 +80,7 @@ function composeForm({ endpoint, recipientName = '', senderName = '', submitLabe
 
     <fieldset class="capsule">
       <label class="toggle">
-        <input type="checkbox" data-capsule-toggle>
+        <input type="checkbox" name="capsule" data-capsule-toggle>
         <span><strong>Time capsule</strong> — keep it sealed until a certain day</span>
       </label>
       <label class="field" data-capsule-field hidden>
@@ -97,7 +97,7 @@ function composeForm({ endpoint, recipientName = '', senderName = '', submitLabe
     <h2>Your postcard is ready to send</h2>
     <p class="share__summary" data-share-summary></p>
     <div class="share__link">
-      <input readonly data-share-url aria-label="Postcard link">
+      <input readonly name="shareUrl" data-share-url aria-label="Postcard link">
       <button type="button" class="button" data-copy>Copy</button>
     </div>
     <div class="share__buttons">
